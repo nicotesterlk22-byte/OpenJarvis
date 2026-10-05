@@ -1,0 +1,65 @@
+name: Build APK Móvel
+
+on:
+  push:
+    branches: [mobile]
+    paths: ['mobile/**', '.github/workflows/mobile-apk.yml']
+  workflow_dispatch:
+    inputs:
+      serverUrl:
+        description: 'URL do servidor (opcional)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Aceitar licenças do Android SDK
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Instalar Gradle
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
+          unzip -q gradle-8.7-bin.zip
+          echo "$PWD/gradle-8.7/bin" >> "$GITHUB_PATH"
+
+      - name: Preparar keystore de assinatura
+        env:
+          KEYSTORE_B64: ${{ secrets.JARVIS_KEYSTORE_B64 }}
+        run: echo "$KEYSTORE_B64" | base64 -d > mobile/app/keystore.p12
+
+      - name: Build APK
+        working-directory: mobile
+        env:
+          JARVIS_KEYSTORE: keystore.p12
+          JARVIS_KEYSTORE_PASSWORD: ${{ secrets.JARVIS_KEYSTORE_PASSWORD }}
+          JARVIS_KEY_ALIAS: ${{ secrets.JARVIS_KEY_ALIAS }}
+          JARVIS_KEY_PASSWORD: ${{ secrets.JARVIS_KEY_PASSWORD }}
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.serverUrl }}" ]; then
+            ARGS="-PserverUrl=${{ github.event.inputs.serverUrl }}"
+          fi
+          gradle assembleRelease $ARGS --no-daemon
+
+      - name: Publicar APK no release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create latest-apk \
+            --title "OpenJarvis Mobile — APK" \
+            --notes "App Jarvis Móvel (WebView para a interface do servidor). Buildado automaticamente pelo CI." \
+            --target "$GITHUB_SHA" || true
+          gh release upload latest-apk mobile/app/build/outputs/apk/release/app-release.apk --clobber
+          gh release view latest-apk --json assets --jq '.assets[0].url'
