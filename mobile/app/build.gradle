@@ -1,5 +1,15 @@
 plugins { id 'com.android.application' }
 
+def getVersionCode = {
+    if (project.hasProperty('versionCode') && project.property('versionCode').toString().isInteger()) {
+        return project.property('versionCode').toInteger()
+    }
+    if (System.getenv('GITHUB_RUN_NUMBER') != null && System.getenv('GITHUB_RUN_NUMBER').isInteger()) {
+        return System.getenv('GITHUB_RUN_NUMBER').toInteger()
+    }
+    return 1
+}
+
 android {
     namespace 'com.openjarvis.mobile'
     compileSdk 34
@@ -8,8 +18,8 @@ android {
         applicationId "com.openjarvis.mobile"
         minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "1.0.0"
+        versionCode getVersionCode()
+        versionName "1.0.${getVersionCode()}"
         buildConfigField "String", "SERVER_URL", "\"${project.findProperty('serverUrl') ?: 'https://openjarvis.up.railway.app'}\""
     }
 

@@ -1,184 +1,120 @@
-<div align="center">
-  <img alt="OpenJarvis" src="assets/OpenJarvis_Horizontal_Logo.png" width="400">
+# Jarvis Móvel 🤖📱
 
-  <p><i>Personal AI, On Personal Devices.</i></p>
+[![Build Mobile APK](https://img.shields.io/github/actions/workflow/status/nicotesterlk22-byte/OpenJarvis/mobile-apk.yml?branch=mobile&label=Build%20Mobile%20APK)](https://github.com/nicotesterlk22-byte/OpenJarvis/actions/workflows/mobile-apk.yml)
+[![Latest APK Release](https://img.shields.io/github/v/release/nicotesterlk22-byte/OpenJarvis?filter=*apk*&label=Latest%20APK)](https://github.com/nicotesterlk22-byte/OpenJarvis/releases/tag/latest-apk)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-  <p>
-    <a href="https://arxiv.org/abs/2605.17172"><img src="https://img.shields.io/badge/arXiv-2605.17172-b31b1b.svg" alt="arXiv"></a>
-    <a href="https://openjarvis.stanford.edu/"><img src="https://img.shields.io/badge/project-OpenJarvis-blue" alt="Project"></a>
-    <a href="https://open-jarvis.github.io/OpenJarvis/"><img src="https://img.shields.io/badge/docs-mkdocs-blue" alt="Docs"></a>
-    <img src="https://img.shields.io/badge/python-%3E%3D3.10-blue" alt="Python">
-    <img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License">
-    <a href="https://discord.gg/CMVBmDQ5Fj"><img src="https://img.shields.io/badge/discord-join-7289da?logo=discord&logoColor=white" alt="Discord"></a>
-    <a href="https://x.com/OpenJarvisAI"><img src="https://img.shields.io/badge/X-@OpenJarvisAI-black?logo=x&logoColor=white" alt="X / Twitter"></a>
-  </p>
-</div>
+O **Jarvis Móvel** é uma evolução do ecossistema **OpenJarvis** voltada para dispositivos Android. Ele combina uma interface nativa WebView de altíssimo desempenho (baseada em React, Tailwind CSS e componentes shadcn/ui) com um backend robusto em FastAPI hospedado na nuvem (Railway).
+
+O agente é capaz de interagir por voz em tempo real em português do Brasil, executar scripts Python e comandos de terminal em um ambiente sandbox isolado, navegar na web com transmissão visual ao vivo para o smartphone e adaptar-se perfeitamente ao uso cotidiano.
 
 ---
 
-<div align="center">
-  <img alt="OpenJarvis demo reel" src="assets/openjarvis_demo_reel.webp" width="75%">
-</div>
+## 🏗️ Arquitetura do Sistema
+
+O Jarvis Móvel segue uma arquitetura descentralizada e segura, onde o aplicativo Android atua como cliente fino e interativo, comunicando-se com o backend via conexões criptografadas (HTTPS e WebSockets).
+
+```text
++-------------------------------------------------------------------------+
+|                          APLICATIVO ANDROID                             |
+|  [ MainActivity.java (WebView com RECORD_AUDIO, Uploads e Downloads) ]  |
+|  [ Frontend React + Vite + Tailwind CSS / shadcn/ui (Mobile-First) ]    |
++-------------------------------------------------------------------------+
+                                    |
+                            HTTPS / WSS (Auth Token)
+                                    v
++-------------------------------------------------------------------------+
+|                       BACKEND FASTAPI (RAILWAY)                         |
+|                                                                         |
+|  +-----------------------+  +----------------------------------------+  |
+|  |   Auth Middleware     |  | Subprocess Sandbox (Python/Bash)       |  |
+|  |   (Constant-time)     |  | (Timeout 30s, RAM 512MB, Env Clean)    |  |
+|  +-----------------------+  +----------------------------------------+  |
+|                                                                         |
+|  +-----------------------+  +----------------------------------------+  |
+|  | Voz em Tempo Real     |  | Visual Ao Vivo (Playwright Browser)    |  |
+|  | - STT: faster-whisper |  | - Proteção SSRF anti-loopback/RFC1918  |  |
+|  | - TTS: Piper pt-BR    |  | - WebSocket Screenshot Streaming       |  |
+|  +-----------------------+  +----------------------------------------+  |
++-------------------------------------------------------------------------+
+```
+
+### Componentes Chave:
+1. **Cliente Móvel (APK WebView):** Encapsula a interface web moderna, gerenciando permissões nativas de áudio (`RECORD_AUDIO`), seleção de arquivos para upload e downloads.
+2. **Sandbox de Comandos:** Executor isolado para tarefas em Python/Bash com restrições rígidas de memória, tempo limite e eliminação de variáveis de ambiente sensíveis.
+3. **Engine de Voz:** Suporte offline/neural a fala em Português com **faster-whisper** (reconhecimento de voz STT) e **Piper** (síntese de voz TTS com respostas em streaming).
+4. **Visual ao Vivo:** Navegação automatizada controlada via **Playwright**, transmitindo capturas de tela em tempo real via WebSocket para acompanhamento pelo usuário.
 
 ---
 
-> **[Documentation](https://open-jarvis.github.io/OpenJarvis/)**
->
-> **[Project Site](https://openjarvis.stanford.edu/)**
->
-> **[Paper](https://arxiv.org/abs/2605.17172)**
->
-> **[Leaderboard](https://open-jarvis.github.io/OpenJarvis/leaderboard/)**
->
-> **[Roadmap](https://open-jarvis.github.io/OpenJarvis/development/roadmap/)**
+## 🗺️ Roadmap de Funcionalidades
 
-## Why OpenJarvis?
+- [x] **Execução Segura em Sandbox:** Execução de scripts Python e comandos Bash com limites de recurso e timeout de 30s.
+- [x] **Voz em Tempo Real (pt-BR):** Transcrição (STT com `faster-whisper`) e síntese vocal neural (TTS com `Piper`).
+- [x] **Visual ao Vivo:** Transmissão em tempo real do navegador do agente (Playwright) via WebSocket.
+- [x] **Interface Mobile-First:** Design otimizado para celulares com React, shadcn/ui, animações fluidas e tema escuro.
+- [x] **Aplicativo Nativo Android:** Wrapper otimizado com suporte a microfone, downloads e uploads.
+- [x] **CI/CD Automático:** Workflow do GitHub Actions (`mobile-apk.yml`) para build e publicação automática do APK.
+- [x] **Deploy no Railway:** Containerização e infraestrutura prontas para produção no Railway.
 
-Personal AI agents are exploding in popularity, but nearly all of them still route intelligence through cloud APIs. Your "personal" AI continues to depend on someone else's server. At the same time, our [Intelligence Per Watt](https://www.intelligence-per-watt.ai/) research showed that local language models already handle 88.7% of single-turn chat and reasoning queries, with intelligence efficiency improving 5.3× from 2023 to 2025. The models and hardware are increasingly ready. What has been missing is the software stack to make local-first personal AI practical.
+---
 
-OpenJarvis is that stack. It is a framework for local-first personal AI, built around three core ideas: shared primitives for building on-device agents; evaluations that treat energy, FLOPs, latency, and dollar cost as first-class constraints alongside accuracy; and a learning loop that improves models using local trace data. The goal is simple: make it possible to build personal AI agents that run locally by default, calling the cloud only when truly necessary. OpenJarvis aims to be both a research platform and a production foundation for local AI, in the spirit of PyTorch.
+## 📦 Instruções de Build do APK
 
-## Installation
+### 1. Build Automático via CI (GitHub Actions)
+Toda alteração enviada para a branch `mobile` dispara automaticamente o workflow `.github/workflows/mobile-apk.yml`. O workflow compila o projeto Android, assina o aplicativo e atualiza a release [`latest-apk`](https://github.com/nicotesterlk22-byte/OpenJarvis/releases/tag/latest-apk).
 
-Pick your platform and run one command. Each installer handles [uv](https://docs.astral.sh/uv/), the Python venv, Ollama, and a starter model — about 3 minutes on broadband.
+### 2. Compilação Local (Gradle)
+Para compilar o APK localmente em seu ambiente de desenvolvimento:
 
-| Platform | One-liner |
-|---|---|
-| **macOS · Linux · WSL2** | `curl -fsSL https://open-jarvis.github.io/OpenJarvis/install.sh \| bash` |
-| **Native Windows** | `irm https://open-jarvis.github.io/OpenJarvis/install.ps1 \| iex` |
-| **Desktop GUI** | Download `.exe` / `.dmg` / `.deb` / `.rpm` / `.AppImage` from the [latest release](https://github.com/open-jarvis/OpenJarvis/releases) |
+**Pré-requisitos:**
+* JDK 17 ou superior
+* Android SDK e ferramentas de build instaladas
 
-Then `jarvis` to start. The Rust extension and larger models continue downloading in the background; `jarvis doctor` shows status.
+**Passos:**
+1. Navegue até o diretório do projeto Android:
+   ```bash
+   cd mobile
+   ```
+2. Execute a compilação do APK de release via Gradle Wrapper:
+   ```bash
+   ./gradlew assembleRelease
+   ```
+3. O APK gerado estará disponível no caminho:
+   ```text
+   mobile/app/build/outputs/apk/release/app-release-unsigned.apk
+   ```
 
-Platform-specific notes (WSL2 setup, native-Windows scheduled-task service, desktop prerequisites, manual / contributor install): see the [installation docs](https://open-jarvis.github.io/OpenJarvis/getting-started/install/).
+---
 
-## Quick Start
+## 🚀 Deploy do Backend no Railway
 
-```bash
-jarvis                          # start chatting (default: chat-simple)
-jarvis gui                      # start the graphical browser interface
-jarvis init --preset <name> --force  # replace config with a starter preset
-```
+O backend do Jarvis Móvel é executado em um container Docker dedicado no **Railway**.
 
-`jarvis gui` starts the local API server and frontend, then opens the graphical
-chat interface in your default browser. It requires Node.js 22+ and is
-available from a source checkout; packaged desktop installers are available
-from the [latest release](https://github.com/open-jarvis/OpenJarvis/releases).
+### Resumo do Deploy:
+1. Conecte o repositório GitHub ao Railway apontando para a branch `mobile`.
+2. O Railway utilizará as configurações presentes em `railway.json` e o `deploy/docker/Dockerfile.railway`.
+3. Configure as variáveis de ambiente necessárias (como `OPENJARVIS_API_KEY`, provedores de LLM, etc.).
 
-> Prefix `jarvis ...` with `uv run`, or `source .venv/bin/activate` first.
+Para o passo a passo completo e detalhado com todas as variáveis e capturas, consulte o guia oficial de deploy:
+📄 **[Instruções Detalhadas de Deploy no Railway (docs/DEPLOY_RAILWAY.md)](docs/DEPLOY_RAILWAY.md)**
 
-| Preset | What it does |
-|---|---|
-| `morning-digest-mac` / `morning-digest-linux` / `morning-digest-minimal` | Spoken daily briefing from email, calendar, health, news |
-| `deep-research` | Multi-hop research across indexed docs with citations |
-| `code-assistant` | Agent with code execution, file I/O, and shell access |
-| `scheduled-monitor` | Stateful agent on a schedule with memory |
-| `chat-simple` | Lightweight conversation, no tools |
+---
 
-Example:
+## 🔒 Segurança e Tratamento de Segredos
 
-```bash
-jarvis init --preset morning-digest-mac --force
-jarvis connect gdrive          # one OAuth covers Gmail / Calendar / Tasks
-jarvis digest --fresh          # generate and play your first briefing
-```
+A segurança é um pilar fundamental no Jarvis Móvel:
 
-Per-preset deep dives: [morning digest](https://open-jarvis.github.io/OpenJarvis/user-guide/morning-digest/) · [deep research](https://open-jarvis.github.io/OpenJarvis/user-guide/deep-research/) · [code assistant](https://open-jarvis.github.io/OpenJarvis/user-guide/code-assistant/) · [scheduled monitor](https://open-jarvis.github.io/OpenJarvis/user-guide/scheduled-monitor/) · [chat simple](https://open-jarvis.github.io/OpenJarvis/user-guide/chat-simple/) · or the full [quickstart guide](https://open-jarvis.github.io/OpenJarvis/getting-started/quickstart/).
+* **Zero Segredos no Repositório:** Nenhuma chave de API, token ou credencial é armazenada em código-fonte, commits ou mensagens.
+* **Gerenciamento de Segredos:**
+  * **GitHub Secrets:** Utilizados exclusivamente para pipelines de CI/CD (ex.: assinaturas de APK e tokens de release).
+  * **Railway Environment Variables:** Utilizados para armazenar as chaves de API do backend (`OPENJARVIS_API_KEY`, chaves de LLM, etc.) em runtime seguro.
+* **Isolamento de Sandbox:** O executor de comandos sanitiza o ambiente de processos filhos, garantindo que variáveis do processo pai (como tokens de serviço) não fiquem visíveis para os scripts executados.
+* **Comparações Seguras:** Autenticação de tokens utilizando comparação de tempo constante (`secrets.compare_digest`) para prevenir ataques de timing.
+* **Proteção de Rede (SSRF):** Filtros rígidos no navegador do agente bloqueando acessos a endereços IP privados, RFC1918 e endpoints de metadados de nuvem.
 
-### Skills
+---
 
-Skills teach agents how to better use tools and improve their reasoning. Every skill is a tool — agents discover them from a catalog and invoke them on demand.
+## 📄 Licença
 
-```bash
-# Install skills from public sources
-jarvis skill install hermes:arxiv
-jarvis skill sync hermes --category research
-
-# Use skills with any agent
-jarvis ask "Use the code-explainer skill to explain this Python code: for i in range(5): print(i*2)"
-
-# Optimize skills from your trace history
-jarvis optimize skills --policy dspy
-
-# Benchmark the impact
-jarvis bench skills --max-samples 5 --seeds 42
-```
-
-Import from [Hermes Agent](https://github.com/NousResearch/hermes-agent) (~150 skills), [OpenClaw](https://github.com/openclaw/skills) (~13,700 community skills), or any GitHub repo. Skills follow the [agentskills.io](https://agentskills.io/specification) open standard.
-
-See the [Skills User Guide](https://open-jarvis.github.io/OpenJarvis/user-guide/skills/) and [Skills Tutorial](https://open-jarvis.github.io/OpenJarvis/tutorials/skills-workflow/) for details.
-
-### Built-in Agents
-
-OpenJarvis ships with eight built-in agents across three execution modes (on-demand, scheduled, continuous):
-
-| Agent | Type | What it does |
-|-------|------|-------------|
-| `morning_digest` | Scheduled | Daily briefing from email, calendar, health, news — with TTS audio |
-| `deep_research` | On-demand | Multi-hop research with citations across web and local docs |
-| `monitor_operative` | Continuous | Long-horizon monitoring with memory, compression, and retrieval |
-| `orchestrator` | On-demand | Multi-turn reasoning with automatic tool selection |
-| `native_react` | On-demand | ReAct (Thought-Action-Observation) loop agent |
-| `operative` | Continuous | Persistent autonomous agent with state management |
-| `native_openhands` | On-demand | CodeAct — generates and executes Python code |
-| `simple` | On-demand | Single-turn chat, no tools |
-
-See the [User Guide](https://open-jarvis.github.io/OpenJarvis/user-guide/morning-digest/) and [Tutorials](https://open-jarvis.github.io/OpenJarvis/tutorials/) for detailed setup instructions.
-
-Full documentation — including Docker deployment, cloud engines, development setup, and tutorials — at **[open-jarvis.github.io/OpenJarvis](https://open-jarvis.github.io/OpenJarvis/)**.
-
-## Community
-
-- **GitHub:** [github.com/open-jarvis/OpenJarvis](https://github.com/open-jarvis/OpenJarvis)
-- **Discord:** [discord.gg/CMVBmDQ5Fj](https://discord.gg/CMVBmDQ5Fj)
-- **X / Twitter:** [@OpenJarvisAI](https://x.com/OpenJarvisAI)
-- **Docs:** [open-jarvis.github.io/OpenJarvis](https://open-jarvis.github.io/OpenJarvis/)
-
-## Contributing
-
-We welcome contributions! See the [Contributing Guide](CONTRIBUTING.md) for incentives, contribution types, and the PR process.
-
-Quick start for contributors:
-
-```bash
-git clone https://github.com/open-jarvis/OpenJarvis.git
-cd OpenJarvis
-uv sync --extra dev
-uv run pre-commit install
-uv run pytest tests/ -v
-```
-
-Browse the [Roadmap](https://open-jarvis.github.io/OpenJarvis/development/roadmap/) for areas where help is needed. Comment **"take"** on any issue to get auto-assigned.
-
-## About
-
-OpenJarvis is part of [Intelligence Per Watt](https://www.intelligence-per-watt.ai/), a research initiative studying the intelligence efficiency of AI systems. The project is developed at [Hazy Research](https://hazyresearch.stanford.edu/) and the [Scaling Intelligence Lab](https://scalingintelligence.stanford.edu/) at [Stanford SAIL](https://ai.stanford.edu/).
-
-## Sponsors
-
-<p>
-  <a href="https://www.laude.org/">Laude Institute</a> &bull;
-  <a href="https://datascience.stanford.edu/marlowe">Stanford Marlowe</a> &bull;
-  <a href="https://cloud.google.com/">Google Cloud Platform</a> &bull;
-  <a href="https://lambda.ai/">Lambda Labs</a> &bull;
-  <a href="https://ollama.com/">Ollama</a> &bull;
-  <a href="https://research.ibm.com/">IBM Research</a> &bull;
-  <a href="https://hai.stanford.edu/">Stanford HAI</a>
-</p>
-
-## Citation
-```bibtex
-@misc{saadfalcon2026openjarvispersonalaipersonal,
-      title={OpenJarvis: Personal AI, On Personal Devices}, 
-      author={Jon Saad-Falcon and Avanika Narayan and Robby Manihani and Tanvir Bhathal and Herumb Shandilya and Hakki Orhun Akengin and Gabriel Bo and Andrew Park and Matthew Hart and Caia Costello and Chuan Li and Christopher Ré and Azalia Mirhoseini},
-      year={2026},
-      eprint={2605.17172},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2605.17172}, 
-}
-```
-
-## License
-
-[Apache 2.0](LICENSE)
+Este projeto é distribuído sob a licença [Apache 2.0](LICENSE).

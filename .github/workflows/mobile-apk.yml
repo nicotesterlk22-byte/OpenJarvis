@@ -47,9 +47,9 @@ jobs:
           JARVIS_KEY_ALIAS: ${{ secrets.JARVIS_KEY_ALIAS }}
           JARVIS_KEY_PASSWORD: ${{ secrets.JARVIS_KEY_PASSWORD }}
         run: |
-          ARGS=""
+          ARGS="-PversionCode=${{ github.run_number }}"
           if [ -n "${{ github.event.inputs.serverUrl }}" ]; then
-            ARGS="-PserverUrl=${{ github.event.inputs.serverUrl }}"
+            ARGS="$ARGS -PserverUrl=${{ github.event.inputs.serverUrl }}"
           fi
           gradle assembleRelease $ARGS --no-daemon
 
