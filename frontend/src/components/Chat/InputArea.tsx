@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Send, Square, Paperclip, Search } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Send, Square, Paperclip, Search, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore, generateId } from '../../lib/store';
 import { streamChat, streamResearch } from '../../lib/sse';
@@ -333,10 +334,6 @@ export function InputArea() {
               duration_s: ev.duration_s,
             });
           } else if (ev.type === 'error') {
-            // Backend setup/worker failure (Ollama down, planner model
-            // missing, KnowledgeStore locked, etc.). Without surfacing the
-            // message, the user sees only the generic "No response was
-            // generated" fallback and has no way to self-diagnose.
             const msg = ev.message || 'Research failed (no detail provided)';
             accumulatedContent = accumulatedContent
               ? `${accumulatedContent}\n\n**Research stopped:** ${msg}`
@@ -359,15 +356,8 @@ export function InputArea() {
                   (ev.usage.prompt_tokens ?? 0) +
                     (ev.usage.completion_tokens ?? 0),
               };
-              // Optimistically roll this research turn into the session
-              // counters so the Session panel updates the moment the
-              // stream finishes, regardless of how /v1/savings aggregates
-              // research telemetry server-side.
               useAppStore.getState().incrementSavings(usage);
             }
-            // Hold the final live numbers visible for a beat so the panel
-            // doesn't flash to 0 between the SSE close and the next
-            // /v1/telemetry/energy poll picking up the persisted record.
             window.setTimeout(() => {
               useAppStore.getState().setLiveEnergy(null);
             }, 1500);
@@ -375,149 +365,122 @@ export function InputArea() {
           }
         }
       } else {
-      for await (const sseEvent of streamChat(
-        { model: selectedModel, messages: apiMessages, stream: true, temperature, max_tokens: maxTokens },
-        controller.signal,
-      )) {
-        const eventName = sseEvent.event;
+        for await (const sseEvent of streamChat(
+          { model: selectedModel, messages: apiMessages, stream: true, temperature, max_tokens: maxTokens },
+          controller.signal,
+        )) {
+          const eventName = sseEvent.event;
 
-        if (eventName === 'agent_turn_start') {
-          setStreamState({ phase: 'Agent thinking...' });
-        } else if (eventName === 'inference_start') {
-          setStreamState({ phase: 'Generating...' });
-          useAppStore.getState().addLogEntry({
-            timestamp: Date.now(), level: 'info', category: 'chat',
-            message: `Generating with ${selectedModel}...`,
-          });
-        } else if (eventName === 'tool_call_start') {
-          try {
-            const data = JSON.parse(sseEvent.data);
-            const tc: ToolCallInfo = {
-              id: generateId(),
-              tool: data.tool,
-              arguments: serializeToolCallArguments(data.arguments),
-              status: 'running',
-            };
-            toolCalls.push(tc);
-            setStreamState({
-              phase: `Calling ${data.tool}...`,
-              activeToolCalls: [...toolCalls],
-            });
-            updateLastAssistant(convId, accumulatedContent, [...toolCalls]);
+          if (eventName === 'agent_turn_start') {
+            setStreamState({ phase: 'Agent thinking...' });
+          } else if (eventName === 'inference_start') {
+            setStreamState({ phase: 'Generating...' });
             useAppStore.getState().addLogEntry({
-              timestamp: Date.now(), level: 'info', category: 'tool',
-              message: `Calling ${data.tool}(${serializeToolCallArguments(data.arguments)})`,
+              timestamp: Date.now(), level: 'info', category: 'chat',
+              message: `Generating with ${selectedModel}...`,
             });
-          } catch {}
-        } else if (eventName === 'tool_call_end') {
-          try {
-            const data = JSON.parse(sseEvent.data);
-            const tc = toolCalls.find(
-              (t) => t.tool === data.tool && t.status === 'running',
-            );
-            if (tc) {
-              tc.status = data.success ? 'success' : 'error';
-              tc.latency = data.latency;
-              tc.result = data.result;
-            }
-            setStreamState({
-              phase: 'Generating...',
-              activeToolCalls: [...toolCalls],
-            });
-            updateLastAssistant(convId, accumulatedContent, [...toolCalls]);
-          } catch {}
-        } else {
-          try {
-            const data = JSON.parse(sseEvent.data);
-            const delta = data.choices?.[0]?.delta;
-            if (data.usage) usage = data.usage;
-            if (data.complexity) complexity = data.complexity;
-            routedEngine = engineFromCompletionChunk(data) ?? routedEngine;
-            if (delta?.content) {
-              if (!ttftMs) ttftMs = Date.now() - startTime;
-              accumulatedContent += delta.content;
-              setStreamState({ content: accumulatedContent, phase: '' });
+          } else if (eventName === 'tool_call_start') {
+            try {
+              const data = JSON.parse(sseEvent.data);
+              const tc: ToolCallInfo = {
+                id: generateId(),
+                tool: data.tool,
+                arguments: serializeToolCallArguments(data.arguments),
+                status: 'running',
+              };
+              toolCalls.push(tc);
+              setStreamState({
+                phase: `Calling ${data.tool}...`,
+                activeToolCalls: [...toolCalls],
+              });
+              updateLastAssistant(convId, accumulatedContent, [...toolCalls]);
+              useAppStore.getState().addLogEntry({
+                timestamp: Date.now(), level: 'info', category: 'tool',
+                message: `Calling ${data.tool}(${serializeToolCallArguments(data.arguments)})`,
+              });
+            } catch {}
+          } else if (eventName === 'tool_call_end') {
+            try {
+              const data = JSON.parse(sseEvent.data);
+              const tc = toolCalls.find(
+                (t) => t.tool === data.tool && t.status === 'running',
+              );
+              if (tc) {
+                tc.status = data.success ? 'success' : 'error';
+                tc.latency = data.latency;
+                tc.result = data.result;
+                setStreamState({ activeToolCalls: [...toolCalls] });
+                updateLastAssistant(convId, accumulatedContent, [...toolCalls]);
+                useAppStore.getState().addLogEntry({
+                  timestamp: Date.now(), level: 'info', category: 'tool',
+                  message: `${data.tool} -> ${data.success ? 'ok' : 'error'} (${data.latency ?? 0}ms)`,
+                });
+              }
+            } catch {}
+          } else if (eventName === 'delta' || !eventName) {
+            try {
+              const data = JSON.parse(sseEvent.data);
+              const delta = data.choices?.[0]?.delta?.content || data.content || '';
+              if (delta) {
+                if (!ttftMs) ttftMs = Date.now() - startTime;
+                accumulatedContent += delta;
+                setStreamState({ content: accumulatedContent, phase: '' });
 
-              const now = Date.now();
-              if (now - lastFlush >= 80) {
-                updateLastAssistant(
-                  convId,
-                  accumulatedContent,
-                  toolCalls.length > 0 ? [...toolCalls] : undefined,
-                );
-                lastFlush = now;
+                const now = Date.now();
+                if (now - lastFlush >= 80) {
+                  updateLastAssistant(
+                    convId,
+                    accumulatedContent,
+                    toolCalls.length > 0 ? [...toolCalls] : undefined,
+                  );
+                  lastFlush = now;
+                }
+              }
+              const engine = engineFromCompletionChunk(data);
+              if (engine) routedEngine = engine;
+
+              if (data.usage) {
+                usage = {
+                  prompt_tokens: data.usage.prompt_tokens ?? 0,
+                  completion_tokens: data.usage.completion_tokens ?? 0,
+                  total_tokens: data.usage.total_tokens ?? 0,
+                };
+              }
+              if (data.complexity) {
+                complexity = data.complexity;
+              }
+            } catch {
+              if (sseEvent.data && sseEvent.data !== '[DONE]') {
+                if (!ttftMs) ttftMs = Date.now() - startTime;
+                accumulatedContent += sseEvent.data;
+                setStreamState({ content: accumulatedContent });
               }
             }
-            if (data.choices?.[0]?.finish_reason === 'stop') break;
-          } catch {}
-        }
-      }
-      }
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        // User cancelled or model switch — keep whatever was accumulated
-        if (!accumulatedContent) accumulatedContent = '(Generation stopped)';
-      } else {
-        const errMsg = err?.message || String(err);
-        accumulatedContent =
-          accumulatedContent || `Error: ${errMsg}`;
-        useAppStore.getState().addLogEntry({
-          timestamp: Date.now(), level: 'error', category: 'chat',
-          message: `Stream error: ${errMsg}`,
-        });
-      }
-      // If we tore out mid-research, make sure the live System panel
-      // numbers don't get stuck on the last sample.
-      useAppStore.getState().setLiveEnergy(null);
-    } finally {
-      if (!accumulatedContent) {
-        accumulatedContent = 'No response was generated. Please try again.';
-      }
-      const totalMs = Date.now() - startTime;
-      const appState = useAppStore.getState();
-      const selectedOwner = appState.models.find((m) => m.id === selectedModel)?.owned_by;
-      const engineLabel = resolveChatEngine({
-        routedEngine,
-        serverEngine: appState.serverInfo?.engine,
-        selectedModel,
-        selectedOwner,
-      });
-      const telemetry: MessageTelemetry = {
-        engine: engineLabel,
-        model_id: selectedModel,
-        total_ms: totalMs,
-        ttft_ms: ttftMs,
-        tokens_per_sec: usage?.completion_tokens
-          ? usage.completion_tokens / (totalMs / 1000)
-          : undefined,
-        complexity_score: complexity?.score,
-        complexity_tier: complexity?.tier,
-        suggested_max_tokens: complexity?.suggested_max_tokens,
-      };
-      // Check if the response has digest audio available
-      let audioMeta: { url: string } | undefined;
-      try {
-        const digestRes = await fetch(`${getBase()}/api/digest`);
-        if (digestRes.ok) {
-          const digest = await digestRes.json();
-          if (digest.audio_available) {
-            audioMeta = { url: `${getBase()}/api/digest/audio` };
           }
         }
-      } catch {
-        // Not a digest response or server unavailable — skip
       }
+
+      const totalMs = Date.now() - startTime;
+      const teleEngine = routedEngine ?? resolveChatEngine({ selectedModel });
+      const telemetry: MessageTelemetry = {
+        ttft_ms: ttftMs,
+        total_ms: totalMs,
+        engine: teleEngine,
+        complexity_score: complexity?.score,
+        complexity_tier: complexity?.tier,
+      };
 
       updateLastAssistant(
         convId,
         accumulatedContent,
-        toolCalls.length > 0 ? toolCalls : undefined,
+        toolCalls.length > 0 ? [...toolCalls] : undefined,
         usage,
         telemetry,
-        audioMeta,
-        researchTraces.length > 0 ? researchTraces : undefined,
-        researchSourcesByRef.size > 0 ? flushSources() : undefined,
+        undefined,
+        researchTraces.length > 0 ? [...researchTraces] : undefined,
+        flushSources(),
       );
+
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -529,15 +492,28 @@ export function InputArea() {
       });
       abortRef.current = null;
 
-      // Research path updates session counters optimistically from the
-      // `done` event's usage payload — re-fetching here would overwrite
-      // it with a potentially stale snapshot if the server's research
-      // telemetry hasn't been merged into /v1/savings yet.
       if (!deepResearch) {
         fetchSavings()
           .then((data) => useAppStore.getState().setSavings(data))
           .catch(() => {});
       }
+    } catch (e: any) {
+      if (e.name !== 'AbortError') {
+        const errorContent = accumulatedContent
+          ? `${accumulatedContent}\n\n*[Stream error: ${e.message || 'Connection lost'}]*`
+          : `*[Failed to connect to backend at ${getBase()}]*`;
+        updateLastAssistant(convId, errorContent);
+        useAppStore.getState().addLogEntry({
+          timestamp: Date.now(), level: 'error', category: 'chat',
+          message: `Stream error: ${e.message}`,
+        });
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      resetStream();
+      abortRef.current = null;
     }
   }, [
     input,
@@ -562,95 +538,86 @@ export function InputArea() {
   };
 
   return (
-    <div className="px-4 pb-4 pt-2" style={{ maxWidth: 'var(--chat-max-width)', margin: '0 auto', width: '100%' }}>
+    <div className="px-3 sm:px-4 pb-3 pt-2 w-full max-w-[var(--chat-max-width)] mx-auto relative z-20">
       <div className="mb-2 flex flex-col gap-1">
         <div className="flex items-center gap-2">
-          <button
+          <motion.button
+            whileTap={{ scale: 0.95 }}
             type="button"
             onClick={() => setDeepResearch(!deepResearch)}
             disabled={streamState.isStreaming}
             aria-pressed={deepResearch}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-colors cursor-pointer disabled:cursor-default disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer disabled:cursor-default disabled:opacity-50 touch-target"
             style={{
-              background: deepResearch ? 'var(--color-accent-subtle)' : 'transparent',
+              background: deepResearch ? 'var(--color-accent-subtle)' : 'var(--color-bg-secondary)',
               border: `1px solid ${deepResearch ? 'var(--color-accent)' : 'var(--color-border)'}`,
-              color: deepResearch ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+              color: deepResearch ? 'var(--color-accent)' : 'var(--color-text-secondary)',
             }}
-            title={deepResearch ? 'Deep Research: on' : 'Deep Research: off'}
+            title={deepResearch ? 'Deep Research: ativo' : 'Deep Research: desligado'}
           >
-            <Search size={12} />
-            Deep Research
-          </button>
+            <Sparkles size={14} className={deepResearch ? 'text-[var(--color-accent)] animate-pulse' : ''} />
+            <span>Deep Research</span>
+          </motion.button>
         </div>
         {deepResearch && corpusSync.syncing && corpusSync.itemsSynced > 0 && (
           <div
-            className="text-[11px] leading-snug"
-            style={{ color: 'var(--color-text-tertiary)' }}
+            className="text-[11px] leading-snug px-1 text-[var(--color-text-tertiary)]"
           >
-            Searching over{' '}
-            <span key={corpusSync.itemsSynced} className="sync-bump" style={{ color: 'var(--color-text-secondary)' }}>
+            Sincronizando{' '}
+            <span key={corpusSync.itemsSynced} className="font-semibold text-[var(--color-text-secondary)]">
               {corpusSync.itemsSynced.toLocaleString()}
             </span>{' '}
-            items — sync in progress, results will improve as more data is indexed.
+            itens de dados em segundo plano.
           </div>
         )}
       </div>
+
       <div
-        className="flex items-center gap-2 rounded-2xl px-4 py-3 transition-shadow"
-        style={{
-          background: 'var(--color-input-bg)',
-          border: '1px solid var(--color-input-border)',
-          boxShadow: 'var(--shadow-sm)',
-        }}
+        className="flex items-center gap-2 rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 transition-all border border-[var(--color-border)] bg-[var(--color-input-bg)] shadow-md focus-within:border-[var(--color-accent)]"
       >
         <textarea
           ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={selectedModel ? 'Message OpenJarvis...' : 'Pick a model first (⌘K)...'}
+          placeholder={selectedModel ? 'Pergunte ao Jarvis...' : 'Selecione um modelo (⌘K)...'}
           rows={1}
-          className="flex-1 bg-transparent outline-none resize-none text-sm leading-relaxed"
-          style={{ color: 'var(--color-text)', maxHeight: '200px' }}
+          className="flex-1 bg-transparent outline-none resize-none text-sm sm:text-base leading-relaxed text-[var(--color-text)] placeholder-[var(--color-text-tertiary)]"
+          style={{ maxHeight: '180px' }}
           disabled={streamState.isStreaming || modelLoading}
         />
         {isCurrentChatStreaming ? (
-          <button
+          <motion.button
+            whileTap={{ scale: 0.92 }}
             onClick={stopStreaming}
-            className="p-2 rounded-xl transition-colors shrink-0 cursor-pointer"
-            style={{ background: 'var(--color-error)', color: 'var(--color-on-accent)' }}
-            title="Stop generating"
+            className="touch-target p-2.5 rounded-xl transition-colors shrink-0 cursor-pointer bg-[var(--color-error)] text-[var(--color-on-accent)]"
+            title="Parar geração"
           >
             <Square size={16} />
-          </button>
+          </motion.button>
         ) : (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <MicButton
               state={speechState}
               onClick={handleMicClick}
               disabled={micDisabled}
               reason={micReason}
             />
-            <button
+            <motion.button
+              whileTap={{ scale: 0.94 }}
               onClick={sendMessage}
               disabled={streamState.isStreaming || !input.trim() || modelLoading || !selectedModel}
-              title={selectedModel ? 'Send message' : 'Pick a model first (⌘K)'}
-              className="p-2 rounded-xl transition-colors shrink-0 cursor-pointer disabled:opacity-30 disabled:cursor-default"
+              title={selectedModel ? 'Enviar mensagem' : 'Selecione um modelo primeiro (⌘K)'}
+              className="touch-target p-2.5 rounded-xl transition-all shrink-0 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
               style={{
                 background: input.trim() ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
-                color: input.trim() ? 'white' : 'var(--color-text-tertiary)',
+                color: input.trim() ? 'var(--color-on-accent)' : 'var(--color-text-tertiary)',
               }}
             >
               <Send size={16} />
-            </button>
+            </motion.button>
           </div>
         )}
-      </div>
-      <div className="flex items-center justify-center mt-2 text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
-        <span>
-          <kbd className="font-mono">Enter</kbd> to send &middot;{' '}
-          <kbd className="font-mono">Shift+Enter</kbd> for new line
-        </span>
       </div>
     </div>
   );

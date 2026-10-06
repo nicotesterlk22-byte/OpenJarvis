@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   MessageSquare,
   Plus,
@@ -43,35 +44,36 @@ export function Sidebar() {
 
   const messages = useAppStore((s) => s.messages);
   const handleNewChat = () => {
-    // Don't create a new chat if the current one is empty
     if (messages.length === 0) {
       navigate('/');
       return;
     }
     createConversation(selectedModel);
     navigate('/');
+    if (window.innerWidth < 768) {
+      useAppStore.getState().setSidebarOpen(false);
+    }
   };
 
   const navItems = [
-    { path: '/', icon: MessageSquare, label: 'Chat' },
-    { path: '/dashboard', icon: BarChart3, label: 'Dashboard' },
-    { path: '/data-sources', icon: Database, label: 'Data Sources' },
-    { path: '/agents', icon: Bot, label: 'Agents' },
-    { path: '/logs', icon: ScrollText, label: 'Logs' },
-    { path: '/settings', icon: Settings, label: 'Settings' },
-    { path: '/get-started', icon: Rocket, label: 'Get Started' },
+    { path: '/', icon: MessageSquare, label: 'Conversa (Chat)' },
+    { path: '/data-sources', icon: Database, label: 'Fontes de Dados' },
+    { path: '/agents', icon: Bot, label: 'Agentes de IA' },
+    { path: '/dashboard', icon: BarChart3, label: 'Painel & Métricas' },
+    { path: '/logs', icon: ScrollText, label: 'Logs do Sistema' },
+    { path: '/settings', icon: Settings, label: 'Configurações' },
+    { path: '/get-started', icon: Rocket, label: 'Guia do Jarvis' },
   ];
 
   return (
     <>
-      {/* Collapse button when sidebar is closed */}
+      {/* Desktop collapse button when sidebar is hidden */}
       {!sidebarOpen && (
         <button
           onClick={toggleSidebar}
-          className="fixed top-3 left-3 z-30 p-2 rounded-lg transition-colors cursor-pointer"
-          style={{ color: 'var(--color-text-secondary)', background: 'var(--color-bg-secondary)' }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-bg-tertiary)')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-bg-secondary)')}
+          className="hidden md:flex fixed top-3 left-3 z-30 p-2.5 rounded-xl transition-all hover:scale-105 cursor-pointer border border-[var(--color-border)] bg-[var(--color-bg-secondary)] shadow-sm"
+          style={{ color: 'var(--color-text-secondary)' }}
+          title="Expandir menu lateral"
         >
           <PanelLeft size={18} />
         </button>
@@ -79,9 +81,9 @@ export function Sidebar() {
 
       <aside
         className={`
-          flex flex-col h-full shrink-0 transition-all duration-200 ease-in-out overflow-hidden
+          flex flex-col h-full shrink-0 transition-all duration-200 ease-out overflow-hidden
           fixed md:relative z-30
-          ${sidebarOpen ? 'w-[260px]' : 'w-0'}
+          ${sidebarOpen ? 'w-[280px]' : 'w-0'}
         `}
         style={{
           background: 'var(--color-sidebar)',
@@ -90,140 +92,120 @@ export function Sidebar() {
           borderRight: sidebarOpen ? '1px solid var(--color-border)' : 'none',
         }}
       >
-        <div className="flex flex-col h-full w-[260px]">
+        <div className="flex flex-col h-full w-[280px] pt-safe pb-safe">
           {/* Header */}
           <div className="flex items-center justify-between px-3 pt-3 pb-2">
             <button
               onClick={toggleSidebar}
-              className="p-2 rounded-lg transition-colors cursor-pointer"
-              style={{ color: 'var(--color-text-secondary)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-bg-tertiary)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              className="touch-target p-2 rounded-xl transition-colors cursor-pointer text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]"
             >
-              <PanelLeftClose size={18} />
+              <PanelLeftClose size={20} />
             </button>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => updateSettings({ theme: nextTheme })}
-                className="p-2 rounded-lg transition-colors cursor-pointer"
-                style={{ color: 'var(--color-text-secondary)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-bg-tertiary)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                title={`Theme: ${settings.theme} (click for ${nextTheme})`}
+                className="touch-target p-2 rounded-xl transition-colors cursor-pointer text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]"
+                title={`Tema: ${settings.theme} (clique para ${nextTheme})`}
               >
-                <ThemeIcon size={16} />
+                <ThemeIcon size={18} />
               </button>
               <button
                 onClick={handleNewChat}
-                className="p-2 rounded-lg transition-colors cursor-pointer"
-                style={{ color: 'var(--color-text-secondary)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-bg-tertiary)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                title="New chat"
+                className="touch-target p-2 rounded-xl transition-colors cursor-pointer text-[var(--color-accent)] bg-[var(--color-accent-subtle)] hover:opacity-90"
+                title="Nova conversa"
               >
-                <Plus size={18} />
+                <Plus size={20} />
               </button>
             </div>
           </div>
 
-          {/* Model badge */}
-          <button
+          {/* Model selector badge */}
+          <motion.button
+            whileTap={{ scale: 0.98 }}
             onClick={() => setCommandPaletteOpen(true)}
-            className="mx-3 mb-2 flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors cursor-pointer"
-            style={{
-              background: 'var(--color-bg-secondary)',
-              color: 'var(--color-text-secondary)',
-              border: '1px solid var(--color-border)',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-bg-tertiary)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-bg-secondary)')}
+            className="mx-3 mb-3 flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs transition-colors cursor-pointer border border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:border-[var(--color-accent)]"
           >
             {modelLoading ? (
-              <Loader2 size={14} className="animate-spin" style={{ color: 'var(--color-accent)' }} />
+              <Loader2 size={16} className="animate-spin text-[var(--color-accent)]" />
             ) : (
-              <Cpu size={14} />
+              <Cpu size={16} className="text-[var(--color-accent)]" />
             )}
             <div className="flex-1 min-w-0">
               <span
-                className="truncate block text-left"
+                className="truncate block text-left font-medium"
                 style={{ color: deepResearch ? 'var(--color-accent)' : 'var(--color-text)' }}
               >
                 {deepResearch
                   ? 'Deep Research'
-                  : selectedModel || serverInfo?.model || 'Select model'}
+                  : selectedModel || serverInfo?.model || 'Selecionar modelo'}
               </span>
               {modelLoading && (
-                <span className="text-[10px] block text-left" style={{ color: 'var(--color-accent)' }}>
-                  Loading model...
+                <span className="text-[10px] block text-left text-[var(--color-accent)]">
+                  Carregando modelo...
                 </span>
               )}
             </div>
             {!modelLoading && (
               <kbd
-                className="text-[10px] px-1.5 py-0.5 rounded font-mono"
-                style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-tertiary)' }}
+                className="text-[10px] px-1.5 py-0.5 rounded-md font-mono bg-[var(--color-bg-tertiary)] text-[var(--color-text-tertiary)]"
               >
                 ⌘K
               </kbd>
             )}
-          </button>
+          </motion.button>
 
-          {/* Search */}
+          {/* Search box */}
           <div className="px-3 mb-2">
             <div
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm"
-              style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm border border-[var(--color-border)] bg-[var(--color-bg-secondary)]"
             >
-              <Search size={14} style={{ color: 'var(--color-text-tertiary)' }} />
+              <Search size={16} className="text-[var(--color-text-tertiary)]" />
               <input
                 type="text"
-                placeholder="Search chats..."
+                placeholder="Buscar conversas..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 bg-transparent outline-none text-sm"
-                style={{ color: 'var(--color-text)' }}
+                className="flex-1 bg-transparent outline-none text-sm text-[var(--color-text)] placeholder-[var(--color-text-tertiary)]"
               />
             </div>
           </div>
 
           {/* Conversation list */}
-          <div className="flex-1 overflow-y-auto px-2">
+          <div className="flex-1 overflow-y-auto px-2 my-1">
             <ConversationList searchQuery={searchQuery} />
           </div>
 
-          {/* Bottom nav */}
-          <nav className="px-2 pb-3 pt-2 flex flex-col gap-0.5" style={{ borderTop: '1px solid var(--color-border)' }}>
+          {/* Bottom nav menu */}
+          <nav className="px-2 pb-3 pt-2 flex flex-col gap-1 border-t border-[var(--color-border)]">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <button
                   key={item.path}
-                  onClick={() => navigate(item.path)}
-                  className="relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors w-full text-left cursor-pointer"
+                  onClick={() => {
+                    navigate(item.path);
+                    if (window.innerWidth < 768) {
+                      useAppStore.getState().setSidebarOpen(false);
+                    }
+                  }}
+                  className="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all w-full text-left cursor-pointer touch-target"
                   style={{
                     background: isActive ? 'var(--color-accent-subtle)' : 'transparent',
                     color: isActive ? 'var(--color-text)' : 'var(--color-text-secondary)',
-                    fontWeight: isActive ? 500 : 400,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) e.currentTarget.style.background = 'var(--color-bg-secondary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) e.currentTarget.style.background = 'transparent';
+                    fontWeight: isActive ? 600 : 400,
                   }}
                 >
                   {isActive && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full"
-                      style={{
-                        background: 'var(--color-accent)',
-                        boxShadow: '0 0 8px var(--color-accent-glow)',
-                      }}
+                    <motion.span
+                      layoutId="sidebarActiveBar"
+                      className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-[var(--color-accent)]"
                     />
                   )}
-                  <item.icon size={16} style={isActive ? { color: 'var(--color-accent)' } : undefined} />
-                  {item.label}
+                  <item.icon
+                    size={18}
+                    style={{ color: isActive ? 'var(--color-accent)' : 'inherit' }}
+                  />
+                  <span>{item.label}</span>
                 </button>
               );
             })}

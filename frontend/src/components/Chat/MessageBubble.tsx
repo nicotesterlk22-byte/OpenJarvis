@@ -5,6 +5,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import 'katex/dist/katex.min.css';
+import { motion } from 'framer-motion';
 import { Copy, Check } from 'lucide-react';
 import { AudioPlayer } from './AudioPlayer';
 import { ToolCallCard } from './ToolCallCard';
@@ -49,26 +50,21 @@ function CodeBlockPre({ children, ...props }: any) {
 
   return (
     <div
-      className="code-block-wrapper relative my-3"
-      style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden' }}
+      className="code-block-wrapper relative my-3 border border-[var(--color-border)] rounded-xl overflow-hidden shadow-xs"
     >
       <div
-        className="flex items-center justify-between px-4 py-1.5 text-xs"
-        style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-tertiary)' }}
+        className="flex items-center justify-between px-3.5 py-1.5 text-xs bg-[var(--color-bg-tertiary)] text-[var(--color-text-tertiary)]"
       >
-        <span className="font-mono">{lang || 'code'}</span>
+        <span className="font-mono text-[11px] font-medium">{lang || 'código'}</span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 px-2 py-0.5 rounded transition-colors cursor-pointer"
-          style={{ color: 'var(--color-text-tertiary)' }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-secondary)')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-tertiary)')}
+          className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] hover:bg-[var(--color-bg-secondary)] transition-colors cursor-pointer"
         >
-          {copied ? <Check size={12} /> : <Copy size={12} />}
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? <Check size={12} className="text-[var(--color-success)]" /> : <Copy size={12} />}
+          <span>{copied ? 'Copiado' : 'Copiar'}</span>
         </button>
       </div>
-      <pre {...props} style={{ margin: 0, borderRadius: 0 }}>
+      <pre {...props} className="p-3 text-xs overflow-x-auto bg-[var(--color-code-bg)]">
         {children}
       </pre>
     </div>
@@ -87,22 +83,18 @@ function CopyMessageButton({ content }: { content: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-      style={{ color: 'var(--color-text-tertiary)' }}
-      title="Copy message"
+      className="p-1.5 rounded-lg text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-all cursor-pointer touch-target"
+      title="Copiar mensagem"
     >
-      {copied ? <Check size={14} /> : <Copy size={14} />}
+      {copied ? <Check size={14} className="text-[var(--color-success)]" /> : <Copy size={14} />}
     </button>
   );
 }
 
 export function MessageBubble({ message, isLive = false }: Props) {
   const isUser = message.role === 'user';
-
   const cleanContent = useMemo(() => stripThinkTags(message.content), [message.content]);
 
-  // Build a ref→source lookup once per render. Memoized so the rehype plugin
-  // identity stays stable until the source list actually changes.
   const sourcesMap = useMemo(() => {
     const m = new Map<number, NonNullable<ChatMessage['researchSources']>[number]>();
     for (const s of message.researchSources ?? []) {
@@ -119,26 +111,36 @@ export function MessageBubble({ message, isLive = false }: Props) {
 
   if (isUser) {
     return (
-      <div className="flex justify-end mb-4">
+      <motion.div
+        initial={{ opacity: 0, y: 8, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
+        className="flex justify-end mb-4"
+      >
         <div
-          className="max-w-[85%] px-4 py-2.5 text-sm leading-relaxed"
+          className="max-w-[88%] sm:max-w-[80%] px-4 py-3 text-sm leading-relaxed shadow-sm border border-[var(--color-border)]"
           style={{
             background: 'var(--color-user-bubble)',
             color: 'var(--color-user-bubble-text)',
-            borderRadius: 'var(--radius-xl) var(--radius-xl) var(--radius-sm) var(--radius-xl)',
+            borderRadius: '1.25rem 1.25rem 0.25rem 1.25rem',
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
           }}
         >
           {message.content}
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="group mb-6">
-      {/* Deep Research timeline (steps + status) */}
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className="group mb-6 max-w-full"
+    >
+      {/* Deep Research timeline */}
       {(message.isResearch || (message.researchTraces && message.researchTraces.length > 0)) && (
         <ResearchTimeline
           traces={message.researchTraces ?? []}
@@ -156,12 +158,12 @@ export function MessageBubble({ message, isLive = false }: Props) {
         </div>
       )}
 
-      {/* Audio player (e.g. morning digest) */}
+      {/* Audio player */}
       {message.audio?.url && <AudioPlayer src={message.audio.url} />}
 
       {/* Assistant message */}
       {cleanContent && (
-        <div className="prose max-w-none">
+        <div className="prose max-w-none text-sm text-[var(--color-text)]">
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkMath]}
             rehypePlugins={rehypePlugins}
@@ -174,8 +176,8 @@ export function MessageBubble({ message, isLive = false }: Props) {
         </div>
       )}
 
-      {/* Footer: copy + read aloud + x-ray */}
-      <div className="flex items-center gap-2 mt-1.5">
+      {/* Footer controls */}
+      <div className="flex items-center gap-2 mt-2">
         <CopyMessageButton content={cleanContent} />
         {!isUser && !isLive && (
           <SpeakMessageButton messageId={message.id} content={cleanContent} />
@@ -186,6 +188,6 @@ export function MessageBubble({ message, isLive = false }: Props) {
         telemetry={message.telemetry}
         isResearch={message.isResearch}
       />
-    </div>
+    </motion.div>
   );
 }
