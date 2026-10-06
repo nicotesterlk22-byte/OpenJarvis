@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from openjarvis.server.sandbox_routes import router as sandbox_router
+from openjarvis.server.voice_routes import router as voice_router
 from openjarvis.server.analytics_routes import router as analytics_router
 from openjarvis.server.api_routes import include_all_routes
 from openjarvis.server.comparison import comparison_router
@@ -21,6 +22,7 @@ from openjarvis.server.dashboard import dashboard_router
 from openjarvis.server.digest_routes import create_digest_router
 from openjarvis.server.research_router import router as research_router
 from openjarvis.server.routes import router
+from openjarvis.server.visual_routes import router as visual_router
 from openjarvis.server.upload_router import router as upload_router
 
 logger = logging.getLogger(__name__)
@@ -501,6 +503,8 @@ def create_app(
     app.include_router(research_router)
     app.include_router(analytics_router)
     app.include_router(sandbox_router)
+    app.include_router(visual_router)
+    app.include_router(voice_router)
 
     include_all_routes(app)
 
